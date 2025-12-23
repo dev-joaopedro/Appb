@@ -20,7 +20,9 @@ export const deleteService = async (id: number) => {
 };
 
 export const getAvailableSlots = async (date: string) => {
-    const response = await api.get(`/appointments/slots?date=${date}`);
+    const barberPhone = localStorage.getItem('selectedBarberPhone') || '';
+    const qs = `date=${encodeURIComponent(date)}${barberPhone ? `&barber_phone=${encodeURIComponent(barberPhone)}` : ''}`;
+    const response = await api.get(`/appointments/slots?${qs}`);
     return response.data; // { date: "...", slots: [...] }
 };
 
@@ -31,7 +33,9 @@ export const createAppointment = async (appointment: {
     appointment_time: string; // ISO string
     notes?: string;
 }) => {
-    const response = await api.post('/appointments', appointment);
+    const barberPhone = localStorage.getItem('selectedBarberPhone') || '';
+    const payload = { ...appointment, barber_phone: barberPhone };
+    const response = await api.post('/appointments', payload);
     return response.data.data;
 };
 

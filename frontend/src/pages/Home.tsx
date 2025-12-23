@@ -3,11 +3,14 @@ import { getServices } from '../api';
 import type { Service } from '../types';
 import { Scissors, Clock, Calendar } from 'lucide-react';
 import BookingModal from '../components/BookingModal';
+import { useNavigate } from 'react-router-dom';
 
 export default function Home() {
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
+    const navigate = useNavigate();
+    const barberPhone = localStorage.getItem('selectedBarberPhone') || '';
 
     useEffect(() => {
         getServices()
@@ -19,9 +22,15 @@ export default function Home() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <header className="bg-slate-900 text-white py-12 px-4 text-center">
-                <h1 className="text-4xl font-bold mb-2">BarberShop Express</h1>
-                <p className="text-gray-400">Agende seu corte em segundos, sem cadastro.</p>
+            <header className="bg-slate-900 text-white py-8 px-4 text-center">
+                <h1 className="text-3xl font-bold mb-2">BarberShop Express</h1>
+                <p className="text-gray-300">Agende seu corte em segundos, sem cadastro.</p>
+                {barberPhone ? (
+                    <div className="mt-4 text-sm text-gray-200">
+                        Agendando para o estabelecimento do número: <strong className="text-yellow-300">{barberPhone}</strong>
+                        <button onClick={() => { localStorage.removeItem('selectedBarberPhone'); navigate('/'); }} className="ml-3 underline">Alterar</button>
+                    </div>
+                ) : null}
                 <button 
                     onClick={() => document.getElementById('services')?.scrollIntoView({ behavior: 'smooth' })}
                     className="mt-6 bg-yellow-500 text-slate-900 px-8 py-3 rounded-full font-bold hover:bg-yellow-400 transition flex items-center mx-auto gap-2"

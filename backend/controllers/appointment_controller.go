@@ -15,6 +15,7 @@ func CreateAppointment(c *gin.Context) {
 		ClientName      string    `json:"client_name" binding:"required"`
 		ClientPhone     string    `json:"client_phone" binding:"required"`
 		ServiceID       uint      `json:"service_id" binding:"required"`
+		BarberPhone     string    `json:"barber_phone"`
 		AppointmentTime time.Time `json:"appointment_time" binding:"required"`
 		Notes           string    `json:"notes"`
 	}
@@ -24,11 +25,23 @@ func CreateAppointment(c *gin.Context) {
 		return
 	}
 
-	// Verificar se o horário está livre
+	// Se informado, buscar o barbeiro pelo telefone
+	var barber *models.User
+	if input.BarberPhone != "" {
+		var u models.User
+		if err := database.DB.Where("phone = ?", input.BarberPhone).First(&u).Error; err == nil {
+			barber = &u
+		}
+	}
+
+	// Verificar se o horário está livre (considerando barbeiro, se informado)
 	var count int64
-	database.DB.Model(&models.Appointment{}).
-		Where("appointment_time = ? AND status != 'CANCELED'", input.AppointmentTime).
-		Count(&count)
+	q := database.DB.Model(&models.Appointment{}).
+		Where("appointment_time = ? AND status != 'CANCELED'", input.AppointmentTime)
+	if barber != nil {
+		q = q.Where("barber_id = ?", barber.ID)
+	}
+	q.Count(&count)
 
 	if count > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "Horário indisponível"})
@@ -39,6 +52,7 @@ func CreateAppointment(c *gin.Context) {
 		ClientName:      input.ClientName,
 		ClientPhone:     input.ClientPhone,
 		ServiceID:       input.ServiceID,
+		BarberID:        nil,
 		AppointmentTime: input.AppointmentTime,
 		Notes:           input.Notes,
 		Status:          "PENDING",
@@ -55,6 +69,7 @@ func CreateAppointment(c *gin.Context) {
 // GetAvailableSlots retorna horários livres para uma data
 func GetAvailableSlots(c *gin.Context) {
 	dateStr := c.Query("date") // Formato YYYY-MM-DD
+	barberPhone := c.Query("barber_phone")
 	if dateStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Data é obrigatória"})
 		return
@@ -71,13 +86,20 @@ func GetAvailableSlots(c *gin.Context) {
 	endHour := 18
 	intervalMinutes := 30
 
-	// Buscar agendamentos do dia
+	// Buscar agendamentos do dia (filtrando por barbeiro se informado)
 	var appointments []models.Appointment
 	startTime := parsedDate.Add(time.Duration(startHour) * time.Hour)
 	endTime := parsedDate.Add(time.Duration(endHour) * time.Hour)
 
-	database.DB.Where("appointment_time >= ? AND appointment_time < ? AND status != 'CANCELED'", startTime, endTime).
-		Find(&appointments)
+	q := database.DB.Where("appointment_time >= ? AND appointment_time < ? AND status != 'CANCELED'", startTime, endTime)
+	if barberPhone != "" {
+		var u models.User
+		if err := database.DB.Where("phone = ?", barberPhone).First(&u).Error; err == nil {
+			q = q.Where("barber_id = ?", u.ID)
+		}
+	}
+
+	q.Find(&appointments)
 
 	// Criar mapa de horários ocupados
 	busySlots := make(map[string]bool)
